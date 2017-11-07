@@ -14,43 +14,48 @@
         });
     });
     ajaxxy = function (form_ele){
+        form_ele = $(form_ele).get(0);
         if(form_ele){
-            form_ele = $(form_ele).get(0);
-            //console.log(`-----------form_ele-------------------`);
-            //console.log(form_ele);
-            getPrimaryFn(form_ele);
-            return form_ele;
+            return getPrimaryFn(form_ele);
         }else{
-            return ajaxxy;
+            return getPrimaryFn(ajaxxy);
         }
     }
-    getPrimaryFn(ajaxxy);
     function getPrimaryFn(e){/*给初始属性*/
+        if(e && e._ajaxxy == true){
+            return e;
+        }
         if(e){
+            e._ajaxxy = true;
             e.submit = auto_submit;
             e.t = Translate;
             e.set = set;
             e.get = get;
             e.info = PrivateCreateInfo;
+            return e;
         }
+        return getPrimaryFn(ajaxxy);
     }
-    function get(){
-        if(!this.primaryInterior)createInterior(this);
-        console.log("-----------==get==-------------")
-        console.log(this.primaryInterior)
+    function get(display){
+        if(display){
+            console.log("-----------==get==-------------");
+            console.log(this.primaryInterior);
+        }
+        if(!this.primaryInterior){
+            return createInterior(this);
+        }else{
+            return this.primaryInterior
+        }
     }
     /*设置提交参数*/
     function set(a,b,c){
-        var help =  !a || b =="help" || c || (typeof a == "object" && b) ;
+        var help =  !a || b || c || (typeof a == "object" && b) ;
         if(help){
-            console.log("------------ajaxxy设置帮助------------")
+            console.log("------------ajaxxy设置帮助------------");
             createInterior(true);
-            console.log("------------ajaxxy设置end------------")
 
         }
         var primaryInterior = createInterior(this);
-        console.log("this");
-        console.log(this);
         if(typeof a == "object" ||a instanceof Object){
             for(var p in a){
                 if(p in primaryInterior){
@@ -64,9 +69,6 @@
                     this.primaryInterior[a] = b;
                 }
             }
-        }
-        if(help){
-            console.log(primaryInterior);
         }
     }
     var _this_debug;
