@@ -6,59 +6,62 @@
 	ajaxxy.submit(自动提交事件)
 	@github.com
 */
-
-(function(){
-    if (typeof jQuery === 'undefined') { throw new Error('ajax-xy request jQuery') }
-
-    jQuery(document).ready(function(){
-        jQuery("form").find("button[type='submit']").bind("click",function(){
+(function(jQuery){
+    if (typeof jQuery === 'undefined') { throw new Error('ajax-xy request jQuery') }else{var $ = jQuery}
+    $(document).ready(function(){
+        $("form").find("button[type='submit']").bind("click",function(){
             auto_submit(this);
         });
-    })
-
-    ajaxxy = {
-        "submit":auto_submit,
-        "t":Translate,
-        "set":set,
-        "get":get,
-        "info":PrivateCreateInfo
-    }
-    var primaryInterior = {};
-    function get(){
-        var r = primaryInterior
-        if(r == {}){
-            r = createInterior();
+    });
+    ajaxxy = function (form_ele){
+        if(form_ele){
+            form_ele = $(form_ele).get(0);
+            //console.log(`-----------form_ele-------------------`);
+            //console.log(form_ele);
+            getPrimaryFn(form_ele);
+            return form_ele;
+        }else{
+            return ajaxxy;
         }
-        console.log("-----------==get==-------------")
-        console.log(r)
     }
-    /*输入调试*/
-    var _debug = null;
+    getPrimaryFn(ajaxxy);
+    function getPrimaryFn(e){/*给初始属性*/
+        if(e){
+            e.submit = auto_submit;
+            e.t = Translate;
+            e.set = set;
+            e.get = get;
+            e.info = PrivateCreateInfo;
+        }
+    }
+    function get(){
+        if(!this.primaryInterior)createInterior(this);
+        console.log("-----------==get==-------------")
+        console.log(this.primaryInterior)
+    }
     /*设置提交参数*/
     function set(a,b,c){
         var help =  !a || b =="help" || c || (typeof a == "object" && b) ;
         if(help){
             console.log("------------ajaxxy设置帮助------------")
-            var help_set = createInterior(true);
-            var i = 0;
-            for(var p in help_set){
-                ++i;
-                console.log("("+i+") :" +p+" => "+help_set[p]);
-            }
-            console.log("--------------------------------------")
+            createInterior(true);
+            console.log("------------ajaxxy设置end------------")
 
         }
+        var primaryInterior = createInterior(this);
+        console.log("this");
+        console.log(this);
         if(typeof a == "object" ||a instanceof Object){
-            primaryInterior = createInterior();
             for(var p in a){
                 if(p in primaryInterior){
                     primaryInterior[p] = a[p];
                 }
             }
+            this.primaryInterior = primaryInterior;
         }else{
             if(a && b){
-                if(a in primaryInterior){
-                    primaryInterior[a] = b;
+                if(a in this.primaryInterior){
+                    this.primaryInterior[a] = b;
                 }
             }
         }
@@ -66,9 +69,9 @@
             console.log(primaryInterior);
         }
     }
-    function echoError(power,a){
-        /*一个被调用的符加函数*/
-        if(power === true){
+    var _this_debug;
+    function _debug(a){/*一个被调用的符加函数*/
+        if(_this_debug === true){
             var arg = Array.prototype.slice.call(arguments);
             arg.splice(0,1);
             var t = "";
@@ -89,7 +92,6 @@
 
                 }
             }
-            console.log(t);
         }
     }
     function is_edit(name){
@@ -104,7 +106,12 @@
         return [];
     }
 
-    function createInterior(help){
+    function createInterior(e){
+        var help=false,ele=ajaxxy;
+        if(typeof e == "boolean")
+            help = e;
+        else
+        if(e)ele = e;
         /*创建一个传入auto_submit的默认JSON,若在提交时对Submit传入的JSON会自动覆盖该JSON.之所有用外置函数,是因为该数组在其他函数也有调用*/
         var interior={
             "functionName":{
@@ -137,7 +144,7 @@
             },
             "alertTo":{
                 "value":"default",
-                "comment":"警告内容的显示元素 #xxx | .xxx 字符串,由JQUERY 获取"
+                "comment":"警告内容的显示元素 #xxx | .xxx 字符串,由$ 获取"
             },
             "alertLocation":{
                 "value":"before",
@@ -186,20 +193,24 @@
             /*
             ,"form":{
                 "value":"",
-                "comment":"表单的值 如jQuery("#from")"
+                "comment":"表单的值 如$("#from")"
             }*/
         };
-        var a = {}
-        if(!help){
+        if(help){
+            var n = 0;
+            for(var p in interior){
+                n++;
+                console.log('('+n+') '+p+':'+interior[p].comment);
+            }
+        }
+        if( !ele.primaryInterior ){
+            var a = {}
             for(var p in interior){
                 a[p] = interior[p].value;
             }
-        }else{
-            for(var p in interior){
-                a[p] = interior[p].comment;
-            }
+            ele.primaryInterior = a;
         }
-        return a;
+        return ele.primaryInterior;
     }
     function auto_submit(e,j,ev_){
         /*
@@ -210,13 +221,18 @@
         $(e).attr({
             "type":"button"
         });
-
-        if(!j){
-            var j={};
+        var f=IsForm(e);
+        if(!f){
+            console.warn('-------------5个上级查找不到Form,取消提交-----------------');
+            return;
         }
-        var interior= primaryInterior ? primaryInterior : createInterior();
+        var source_form_ele = $(f).get(0);
+        var interior= source_form_ele.primaryInterior ? source_form_ele.primaryInterior : createInterior(f);
+        if(!j){
+            j={};
+        }
+        _this_debug = ("debug" in j) ? j["debug"] : interior['debug'];
         /*通过bind 返回一个修改过的函数*/
-        _debug = echoError.bind(this,interior['debug']);
         for(var p in j){
             interior[p] = j[p];/*内部值替换为传入值*/
             _debug(p);
@@ -234,15 +250,10 @@
         }
         _debug('-------from start--------');
 
-        var f=IsForm(e);
-        if(!f){
-            _debug('-------------5个上级查找不到Form,取消提交-----------------');
-            return;
-        }
-        var form_ = jQuery(f).get(0);
+        var form_ = $(f).get(0);
         interior['form'] = form_;/*报错时需要用到,默认在表单上面报错.*/
         var submit_ = true;
-        var sendtype = jQuery(form_).attr('method');
+        var sendtype = $(form_).attr('method');
         if(!sendtype){
             sendtype ="get";
         }
@@ -250,7 +261,7 @@
         var pwd='';
         var repwd='';
         var repwdObj = null;
-        var names_ = jQuery(f).find('[name]').toArray().reverse();
+        var names_ = $(f).find('[name]').toArray().reverse();
         var getData={};
         var lastEle = null;
         var editClass = is_edit('editClass');//带有class值的 div为编辑器.
@@ -259,51 +270,51 @@
             var form_up = new FormData();/*新建一个Form用于提交*/
             _debug('-------------打印From表单------------',form_up);
         }
-        jQuery(names_).each(function(a,b){/*翻转为了正向提示*/
-            if(interior.abandon !== true || InArr(interior.unique,jQuery(b).attr('name')) ){
-                if(jQuery(b).attr('type') == 'password'){
+        $(names_).each(function(a,b){/*翻转为了正向提示*/
+            if(interior.abandon !== true || InArr(interior.unique,$(b).attr('name')) ){
+                if($(b).attr('type') == 'password'){
                     if(pwd== '' ){
-                        pwd = jQuery(b).val();
+                        pwd = $(b).val();
                     } else {
-                        repwd = jQuery(b).val();
+                        repwd = $(b).val();
                         repwdObj = b;
                     }
                 }
-                if(jQuery(b).attr('type') != 'file'){
-                    if( !jQuery(b).val() || jQuery(b).val().length < 1){
-                        jQuery(b).focus();
+                if($(b).attr('type') != 'file'){
+                    if( !$(b).val() || $(b).val().length < 1){
+                        $(b).focus();
                         lastEle = b;
                         submit_ = false;
                         /*console.log(b)*/
                     }
                 }
             }
-            var name_tmp = jQuery(b).attr('name');
+            var name_tmp = $(b).attr('name');
             _debug(name_tmp);
-            if(InArr(editClass,jQuery(b).attr('class'))){
+            if(InArr(editClass,$(b).attr('class'))){
                 /*自带的编辑器,不是读取val而是html()*/
                 if(sendtype == 'post'){
-                    form_up.append(name_tmp, jQuery(b).html());
+                    form_up.append(name_tmp, $(b).html());
                 }
                 if(sendtype == 'get'){
-                    getData[name_tmp] = jQuery(b).html();
+                    getData[name_tmp] = $(b).html();
                 }
             }else{
-                var tmptype_input = jQuery(b).attr('type');
+                var tmptype_input = $(b).attr('type');
 
                 if(sendtype == 'post'){
                     _debug('---------post开始获取数据----------');
                     if( tmptype_input == 'file' ){
                         _debug(name_tmp);
-                        if(jQuery(b)[0].files[0]){
-                            form_up.append(name_tmp, jQuery(b)[0].files[0]);
+                        if($(b)[0].files[0]){
+                            form_up.append(name_tmp, $(b)[0].files[0]);
                         }
                     }else{
                         /*------------加入对hceckbox的判断------------*/
                         switch(tmptype_input){
                             case 'checkbox':/*复选框取值方式不同*/
-                                if (jQuery(b).get(0).checked) {
-                                    var v_tmp = jQuery(b).val();
+                                if ($(b).get(0).checked) {
+                                    var v_tmp = $(b).val();
                                 }else{
                                     var v_tmp = '';
                                 }
@@ -311,12 +322,12 @@
                                 form_up.append(name_tmp, v_tmp);
                                 break;
                             case 'radio':/*复选框取值方式不同*/
-                                var v_tmp = jQuery("input:radio[name='"+name_tmp+"']:checked").val();
+                                var v_tmp = $("input:radio[name='"+name_tmp+"']:checked").val();
                                 _debug('---------提取radio值'+name_tmp+'--'+v_tmp+'--');
                                 form_up.append(name_tmp, v_tmp);
                                 break;
                             default:
-                                var v_tmp = jQuery(b).val();
+                                var v_tmp = $(b).val();
                                 _debug('---------提取input值'+name_tmp+'--'+v_tmp+'--');
                                 form_up.append(name_tmp, v_tmp);
                                 break;
@@ -329,17 +340,17 @@
                     _debug('---------get开始获取数据----------');
                     switch(tmptype_input){
                         case 'checkbox':/*复选框取值方式不同*/
-                            if (jQuery(b).get(0).checked) {
-                                getData[name_tmp] = jQuery(b).val();
+                            if ($(b).get(0).checked) {
+                                getData[name_tmp] = $(b).val();
                             }else{
                                 getData[name_tmp] = '';
                             }
                             break;
                         case 'radio':/*复选框取值方式不同*/
-                            getData[name_tmp] = jQuery("input:radio[name='"+name_tmp+"']:checked").val();
+                            getData[name_tmp] = $("input:radio[name='"+name_tmp+"']:checked").val();
                             break;
                         default:
-                            getData[name_tmp] = jQuery(b).val();
+                            getData[name_tmp] = $(b).val();
                             break;
                     }
 
@@ -348,8 +359,8 @@
         });
         if(!submit_){
             _debug('---------表单值需要验证,为空无法提交----------',lastEle);
-            var name_ = jQuery(lastEle).attr('name');
-            var alert_ = jQuery('[for='+name_+']').html();
+            var name_ = $(lastEle).attr('name');
+            var alert_ = $('[for='+name_+']').html();
             if(alert_){
                 PrivateONECreateInfo('请先填写 : '+alert_);
             }else{
@@ -360,12 +371,12 @@
         if(repwd != '' && pwd != repwd){
             _debug(pwd);
             _debug(repwd);
-            jQuery(repwdObj).focus();
+            $(repwdObj).focus();
             alert('---------两次密码不一样---------');
         }else{
             _debug('-------------From 表单名称-------------',form_);
             _debug('请求类型 : '+sendtype);
-            var url = jQuery(form_).attr('action');
+            var url = $(form_).attr('action');
             if(!url){
                 throw new Error("ajaxxy : the form not action address");
             }
@@ -410,6 +421,8 @@
             _debug('------------'+sendtype+'提交 ['+submit_qeust["text"]+'][提交数据:'+submit_qeust["up_data_name"]+']-------------',submit_qeust["data"]);
 
 
+            console.log("-------------test--------------------");
+            console.log(ajaxOption);
             $.ajax(ajaxOption);
             return false;
         }
@@ -430,11 +443,11 @@
             if(n < 0){
                 return false;
             }
-            if( jQuery(e).parent().get(0).tagName.toLowerCase() == 'form' ){
-                return jQuery(e).parent();
+            if( $(e).parent().get(0).tagName.toLowerCase() == 'form' ){
+                return $(e).parent();
             }else{
                 n--;
-                return IsForm(jQuery(e).parent(),n);
+                return IsForm($(e).parent(),n);
             }
         }
 
@@ -454,11 +467,11 @@
                     return false;
                 }
             }
-            if( jQuery(e).parent().attr(name) == value ){
-                return jQuery(e).parent();
+            if( $(e).parent().attr(name) == value ){
+                return $(e).parent();
             }else{
                 n++;
-                return IsEle(jQuery(e).parent(),name,value,max,n);
+                return IsEle($(e).parent(),name,value,max,n);
             }
         }
         /*-------------回调执行函数---------------*/
@@ -526,7 +539,6 @@
         }
         /*-------------------------------------------------*/
     }
-
     function PrivateCreateInfo(info_text,info_type,interior,from_element,debug){
         if(debug){
             console.log("----------======Info DeBug======---------");
@@ -544,7 +556,7 @@
             }
         */
         if(!interior){
-            interior= primaryInterior ? primaryInterior : createInterior();
+            interior = $(from_element).get(0) ? $(from_element).get(0).primaryInterior : createInterior(ajaxxy);
         }
         interior.alertLocation = interior.alertLocation.replace(/\s/g,'').toLowerCase();
         /*info => fa-comment  | warning => fa-exclamation-triangle | success =>fa-check | dismissable(不理会) +> fa-info-circle | danger(危险) fa-times*/
@@ -609,16 +621,16 @@
             from_element = interior['form'];
         }
         /*得到显示的元素*/
-        var alertTo = jQuery(from_element);
+        var alertTo = $(from_element);
         _debug(alertTo);
 
         if(interior.alertTo != 'default'){
-            alertTo = jQuery(interior.alertTo);
+            alertTo = $(interior.alertTo);
         }
         _debug(alertTo);
-        var alerts = jQuery('[data-alertinfo="true"]');
+        var alerts = $('[data-alertinfo="true"]');
 
-        echoError(interior,alerts);
+        _debug(alerts);
         if(alerts.length >= interior.alertMax){
             _debug('--------移除多余警告---------');
             _debug(alerts.eq(0));
@@ -626,41 +638,41 @@
         }
         switch( interior.alertLocation ){
             case 'before':
-                jQuery(alertTo).before(after_html);
+                $(alertTo).before(after_html);
                 break;
             case 'after':
-                jQuery(alertTo).after(after_html);
+                $(alertTo).after(after_html);
                 break;
             case 'self':
-                jQuery(alertTo).html(after_html+jQuery(alertTo).html());
+                $(alertTo).html(after_html+$(alertTo).html());
                 break;
         }
         if(interior.callbackScroll === true){
             var ScrollTop = parseInt(interior.scrollTop);
-            if(ScrollTop > jQuery(document).height()){
-                interior.scrollTop = jQuery(document).height();
+            if(ScrollTop > $(document).height()){
+                interior.scrollTop = $(document).height();
             }
-            jQuery('html,body').animate({scrollTop: interior.scrollTop}, 300);
+            $('html,body').animate({scrollTop: interior.scrollTop}, 300);
         }
     }
 
     function SetVale(){
         /*批量设置默认的值,该值在于元素的data-value上,由模版文件或后端给,该函数只是对select,radio,编辑器等进行设置.*/
-        jQuery('select').each(function(a,b){
-            var $v= jQuery(b).attr('data-value');
+        $('select').each(function(a,b){
+            var $v= $(b).attr('data-value');
             if($v){
-                jQuery(b).find("option[value='"+$v+"']").attr("selected",true);
+                $(b).find("option[value='"+$v+"']").attr("selected",true);
             }
         });
-        jQuery('[type="radio"]').each(function(a,b){
-            jQuery("input:radio[value='"+jQuery(b).attr('data-value')+"']").attr('checked','true');
+        $('[type="radio"]').each(function(a,b){
+            $("input:radio[value='"+$(b).attr('data-value')+"']").attr('checked','true');
         });
     }
 
     function SaveRadio(nameName,v){
-        jQuery('[name="'+nameName+'"]').each(function(a,b){
-            if(jQuery(b).val() == v){
-                jQuery(b).attr('checked','true');
+        $('[name="'+nameName+'"]').each(function(a,b){
+            if($(b).val() == v){
+                $(b).attr('checked','true');
             }
         });
     }
@@ -694,7 +706,7 @@
 
     function AotuHeight(o) {
         /*textarea自适应高度*/
-        o = jQuery(o).get(0);
+        o = $(o).get(0);
         o.style.height = o.scrollTop + o.scrollHeight + "px";
     }
 
@@ -794,6 +806,7 @@
         );
     }
     function GetJavaScriptCode(j,data,bug){
+        _debug._debug = bug;
         if(!data){
             console.log(data);
             console.log('javascriptCode模块有错误,没有传入data');
@@ -803,9 +816,9 @@
         if(j instanceof Object){
             if('javascriptCode' in j){
                 $.get(u+j.javascriptCode,function(code){
-                    echoError(bug,'-------------javascriptCode-------------',code);
+                    _debug('-------------javascriptCode-------------',code);
                     code = code.replace(/\#data\#/,data);
-                    echoError(bug,'-------------javascriptCode-------------',code);
+                    _debug('-------------javascriptCode-------------',code);
                     eval(code);
                 })
             }else{
@@ -818,7 +831,4 @@
             }
         }
     }
-
-})();
-
-
+})(jQuery);
