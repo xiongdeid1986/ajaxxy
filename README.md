@@ -15,7 +15,7 @@ ajaxxy.set(option,[help]) option该表单的提交属性,help(boolean),是否打
 
 -------ajaxxy opgion 设置帮助-------
 
- (1) functionName:回调函数 -> 以window[functionName]()形式调用
+ (1) functionName:回调函数 -> 以window()形式调用
 
  (2) callback:回调执行函数
 
