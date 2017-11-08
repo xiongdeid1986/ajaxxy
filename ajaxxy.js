@@ -49,11 +49,10 @@
     }
     /*设置提交参数*/
     function set(a,b,c){
-        var help =  !a || b || c || (typeof a == "object" && b) ;
+        var help =  !a || b || c || ( typeof a == "object" && b) ;
         if(help){
             console.log("------------ajaxxy设置帮助------------");
             createInterior(true);
-
         }
         var primaryInterior = createInterior(this);
         if(typeof a == "object" ||a instanceof Object){
@@ -71,9 +70,8 @@
             }
         }
     }
-    var _this_debug;
     function _debug(a){/*一个被调用的符加函数*/
-        if(_this_debug === true){
+        if(_debug._this_debug === true){
             var arg = Array.prototype.slice.call(arguments);
             arg.splice(0,1);
             var t = "";
@@ -223,26 +221,24 @@
         $(e).attr({
             "type":"button"
         });
-        var f=IsForm(e);
-        if(!f){
-            console.warn('-------------5个上级查找不到Form,取消提交-----------------');
+        var f=IsForm(e,7);
+        if( !f ){
             return;
         }
         var source_form_ele = $(f).get(0);
         var interior= source_form_ele.primaryInterior ? source_form_ele.primaryInterior : createInterior(f);
-        if(!j){
+        if( !j ){
             j={};
         }
-        _this_debug = ("debug" in j) ? j["debug"] : interior['debug'];
-        /*通过bind 返回一个修改过的函数*/
-        for(var p in j){
+        _debug._this_debug = ("debug" in j) ? j["debug"] : interior['debug'];/*通过bind 返回一个修改过的函数*/
+        for( var p in j ){
             interior[p] = j[p];/*内部值替换为传入值*/
             _debug(p);
             _debug(j[p]);
         }
-        if(interior["confirm"]){
+        if( interior["confirm"] ){
             var confirmText = interior["confirmText"] ? interior["confirmText"] : '是否确认提交?';
-            if(!confirm(confirmText)){
+            if( !confirm( confirmText ) ){
                 return false;
             }
         }
@@ -439,10 +435,9 @@
             return false;
         }
         function IsForm(e,n){
-            if(!n){
-                var n = 6;
-            }
-            if(n < 0){
+            if(!n)n = 6;
+            if(n <= 0){
+                console.warn('-------------'+n+'个上级查找不到Form,取消提交-----------------');
                 return false;
             }
             if( $(e).parent().get(0).tagName.toLowerCase() == 'form' ){
