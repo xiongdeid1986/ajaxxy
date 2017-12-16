@@ -357,16 +357,21 @@
         });
         if(!submit_){
             _debug('---------表单值需要验证,为空无法提交----------',lastEle);
-            var name_ = $(lastEle).attr('name');
-            var alert_ = $('[for='+name_+']').html();
-            if(alert_){
-                PrivateONECreateInfo('请先填写 : '+alert_);
-            }else{
-                PrivateONECreateInfo('请先填写 : '+name_);
-            }
+            var name_ = $(lastEle).attr('name'),alert_;
+			if( name_.match(/\[|\]/) ){
+				PrivateONECreateInfo('请先填写 : '+name_ );
+			}else{
+				try{
+					alert_ = $('[for='+name_+']').html( );
+					PrivateONECreateInfo('请先填写 : '+alert_);
+				}catch(e){
+					console.log(e);.
+					PrivateONECreateInfo('请先填写 : '+name_);
+				}
+			}
             return false;
         }
-        if(repwd != '' && pwd != repwd){
+        if( repwd != '' && pwd != repwd ){
             _debug(pwd);
             _debug(repwd);
             $(repwdObj).focus();
