@@ -237,7 +237,7 @@
             e.remove = function (name){
                 switch (name){
                     case 'error':
-                        removeError(e);
+                        removeError();
                         break;
                 }
             }
@@ -470,22 +470,25 @@
         var submit_ = true;
         var sendtype = $(form_).attr('method');
         if(!sendtype){
-            sendtype ="get";
+            sendtype ="post";
         }
         sendtype = sendtype.toLowerCase()
         var pwd='';
         var repwd='';
         var repwdObj = null;
         var names_ = $(f).find('[name]').toArray().reverse();
-        var getData={};
+        var form_data;
         var lastEle = null;
         var editClass = is_edit('editClass');//带有class值的 div为编辑器.
         _debug(form_);
         if(sendtype == 'post'){
-            var form_up = new FormData();/*新建一个Form用于提交*/
-            _debug('-------------打印From表单------------',form_up);
+            form_data = new FormData(form_);/*新建一个Form用于提交*/
         }
-        $(names_).each(function(a,b){/*翻转为了正向提示*/
+        if(sendtype == 'get'){
+            form_data = $(form_).serialize();/*新建一个Form用于提交*/
+        }
+        $(names_).each(function(a,b){
+            /*判断未填写*/
             var is_skip = !InArr(interior.skip,$(b).attr('name')) && !InArr(interior.skip,$(b).attr('id')),/*跳过*/
                 is_unique = InArr(interior.unique,$(b).attr('name')),/*强制检查*/
                 is_abandon = interior.abandon !== true,/*跳过所有*/
@@ -507,74 +510,18 @@
                     }
                 }
             }
-            var name_tmp = $(b).attr('name');
-            _debug(name_tmp);
             if(InArr(editClass,$(b).attr('class'))){
+                _debug('有个性编辑器...',$(b).attr('name'));
                 /*自带的编辑器,不是读取val而是html()*/
                 if(sendtype == 'post'){
-                    form_up.append(name_tmp, $(b).html());
+                    form_up.append($(b).attr('name'), $(b).html());
                 }
                 if(sendtype == 'get'){
-                    getData[name_tmp] = $(b).html();
-                }
-            }else{
-                var tmptype_input = $(b).attr('type');
-
-                if(sendtype == 'post'){
-                    _debug('---------post开始获取数据----------');
-                    if( tmptype_input == 'file' ){
-                        _debug(name_tmp);
-                        if($(b)[0].files[0]){
-                            form_up.append(name_tmp, $(b)[0].files[0]);
-                        }
-                    }else{
-                        /*------------加入对hceckbox的判断------------*/
-                        switch(tmptype_input){
-                            case 'checkbox':/*复选框取值方式不同*/
-                                if ($(b).get(0).checked) {
-                                    var v_tmp = $(b).val();
-                                }else{
-                                    var v_tmp = '';
-                                }
-                                _debug('---------提取checkbox值'+name_tmp+'--'+v_tmp+'--');
-                                form_up.append(name_tmp, v_tmp);
-                                break;
-                            case 'radio':/*复选框取值方式不同*/
-                                var v_tmp = $("input:radio[name='"+name_tmp+"']:checked").val();
-                                _debug('---------提取radio值'+name_tmp+'--'+v_tmp+'--');
-                                form_up.append(name_tmp, v_tmp);
-                                break;
-                            default:
-                                var v_tmp = $(b).val();
-                                _debug('---------提取input值'+name_tmp+'--'+v_tmp+'--');
-                                form_up.append(name_tmp, v_tmp);
-                                break;
-                        }
-                        /*------------加入对hceckbox的判断------------*/
-                    }
-                }
-                if(sendtype == 'get'){
-                    /*------------加入对hceckbox的判断------------*/
-                    _debug('---------get开始获取数据----------');
-                    switch(tmptype_input){
-                        case 'checkbox':/*复选框取值方式不同*/
-                            if ($(b).get(0).checked) {
-                                getData[name_tmp] = $(b).val();
-                            }else{
-                                getData[name_tmp] = '';
-                            }
-                            break;
-                        case 'radio':/*复选框取值方式不同*/
-                            getData[name_tmp] = $("input:radio[name='"+name_tmp+"']:checked").val();
-                            break;
-                        default:
-                            getData[name_tmp] = $(b).val();
-                            break;
-                    }
-
+                    getData[$(b).attr('name')] = $(b).html();
                 }
             }
         });
+
         if(!submit_){
             _debug('---------表单值需要验证,为空无法提交----------',lastEle);
             var name_ = $(lastEle).attr('name'),alert_;
@@ -587,6 +534,7 @@
             }
             return false;
         }
+
         if( repwd != '' && pwd != repwd ){
             _debug(pwd);
             _debug(repwd);
@@ -605,6 +553,7 @@
                 url: url,
                 type: sendtype,
                 dataType: 'json',
+                data:form_data,
                 timeout: interior["timeout"] ? interior["timeout"] : 2500,
                 success: function (data){
                     _debug("Ajax请求结束",data);
@@ -619,15 +568,10 @@
             };
             var submit_qeust = {};
             /*GET POST提交判断*/
-            if(sendtype == "post"){
-                ajaxOption["data"] =  form_up;
-                submit_qeust["up_data_name"] = "form_up";
-                submit_qeust["data"] = form_up;
-            }else{
-                ajaxOption["data"] =  getData;
-                submit_qeust["up_data_name"] = "getData";
-                submit_qeust["data"] = getData;
-            }
+
+            submit_qeust["up_data_name"] = sendtype;
+            submit_qeust["data"] = form_data;
+
             /*是否跨域判断*/
             if( interior['jsonp'] ){
                 ajaxOption["dataType"] = "jsonp";
@@ -638,8 +582,6 @@
 
             }
             _debug('------------'+sendtype+'提交 ['+submit_qeust["text"]+'][提交数据:'+submit_qeust["up_data_name"]+']-------------',submit_qeust["data"]);
-
-
             console.log("-------------test--------------------");
             console.log(ajaxOption);
             $.ajax(ajaxOption);
@@ -1071,6 +1013,7 @@
 
     /*移除一个报错信息*/
     function removeError(e){
+        if(!e)e=form_ele;
         var id = Getajaxxy(e);
         if(id){
             $('[data-infoToken="'+id+'"]').remove();
