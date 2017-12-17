@@ -8,30 +8,239 @@
 */
 (function(jQuery){
     if (typeof jQuery === 'undefined') { throw new Error('ajax-xy request jQuery') }else{var $ = jQuery}
+
+
+    /*JQuery 扩展md5加密*/
+    var rotateLeft = function (lValue, iShiftBits) {
+        return (lValue << iShiftBits) | (lValue >>> (32 - iShiftBits));
+    }
+    var addUnsigned = function (lX, lY) {
+        var lX4, lY4, lX8, lY8, lResult;
+        lX8 = (lX & 0x80000000);
+        lY8 = (lY & 0x80000000);
+        lX4 = (lX & 0x40000000);
+        lY4 = (lY & 0x40000000);
+        lResult = (lX & 0x3FFFFFFF) + (lY & 0x3FFFFFFF);
+        if (lX4 & lY4) return (lResult ^ 0x80000000 ^ lX8 ^ lY8);
+        if (lX4 | lY4) {
+            if (lResult & 0x40000000) return (lResult ^ 0xC0000000 ^ lX8 ^ lY8);
+            else return (lResult ^ 0x40000000 ^ lX8 ^ lY8);
+        } else {
+            return (lResult ^ lX8 ^ lY8);
+        }
+    }
+    var F = function (x, y, z) {
+        return (x & y) | ((~x) & z);
+    }
+    var G = function (x, y, z) {
+        return (x & z) | (y & (~z));
+    }
+    var H = function (x, y, z) {
+        return (x ^ y ^ z);
+    }
+    var I = function (x, y, z) {
+        return (y ^ (x | (~z)));
+    }
+    var FF = function (a, b, c, d, x, s, ac) {
+        a = addUnsigned(a, addUnsigned(addUnsigned(F(b, c, d), x), ac));
+        return addUnsigned(rotateLeft(a, s), b);
+    };
+    var GG = function (a, b, c, d, x, s, ac) {
+        a = addUnsigned(a, addUnsigned(addUnsigned(G(b, c, d), x), ac));
+        return addUnsigned(rotateLeft(a, s), b);
+    };
+    var HH = function (a, b, c, d, x, s, ac) {
+        a = addUnsigned(a, addUnsigned(addUnsigned(H(b, c, d), x), ac));
+        return addUnsigned(rotateLeft(a, s), b);
+    };
+    var II = function (a, b, c, d, x, s, ac) {
+        a = addUnsigned(a, addUnsigned(addUnsigned(I(b, c, d), x), ac));
+        return addUnsigned(rotateLeft(a, s), b);
+    };
+    var convertToWordArray = function (string) {
+        var lWordCount;
+        var lMessageLength = string.length;
+        var lNumberOfWordsTempOne = lMessageLength + 8;
+        var lNumberOfWordsTempTwo = (lNumberOfWordsTempOne - (lNumberOfWordsTempOne % 64)) / 64;
+        var lNumberOfWords = (lNumberOfWordsTempTwo + 1) * 16;
+        var lWordArray = Array(lNumberOfWords - 1);
+        var lBytePosition = 0;
+        var lByteCount = 0;
+        while (lByteCount < lMessageLength) {
+            lWordCount = (lByteCount - (lByteCount % 4)) / 4;
+            lBytePosition = (lByteCount % 4) * 8;
+            lWordArray[lWordCount] = (lWordArray[lWordCount] | (string.charCodeAt(lByteCount) << lBytePosition));
+            lByteCount++;
+        }
+        lWordCount = (lByteCount - (lByteCount % 4)) / 4;
+        lBytePosition = (lByteCount % 4) * 8;
+        lWordArray[lWordCount] = lWordArray[lWordCount] | (0x80 << lBytePosition);
+        lWordArray[lNumberOfWords - 2] = lMessageLength << 3;
+        lWordArray[lNumberOfWords - 1] = lMessageLength >>> 29;
+        return lWordArray;
+    };
+    var wordToHex = function (lValue) {
+        var WordToHexValue = "", WordToHexValueTemp = "", lByte, lCount;
+        for (lCount = 0; lCount <= 3; lCount++) {
+            lByte = (lValue >>> (lCount * 8)) & 255;
+            WordToHexValueTemp = "0" + lByte.toString(16);
+            WordToHexValue = WordToHexValue + WordToHexValueTemp.substr(WordToHexValueTemp.length - 2, 2);
+        }
+        return WordToHexValue;
+    };
+    var uTF8Encode = function (string) {
+        string = string.replace(/\x0d\x0a/g, "\x0a");
+        var output = "";
+        for (var n = 0; n < string.length; n++) {
+            var c = string.charCodeAt(n);
+            if (c < 128) {
+                output += String.fromCharCode(c);
+            } else if ((c > 127) && (c < 2048)) {
+                output += String.fromCharCode((c >> 6) | 192);
+                output += String.fromCharCode((c & 63) | 128);
+            } else {
+                output += String.fromCharCode((c >> 12) | 224);
+                output += String.fromCharCode(((c >> 6) & 63) | 128);
+                output += String.fromCharCode((c & 63) | 128);
+            }
+        }
+        return output;
+    };
+    $.extend({
+        md5: function (string) {
+            var x = Array();
+            var k, AA, BB, CC, DD, a, b, c, d;
+            var S11 = 7, S12 = 12, S13 = 17, S14 = 22;
+            var S21 = 5, S22 = 9, S23 = 14, S24 = 20;
+            var S31 = 4, S32 = 11, S33 = 16, S34 = 23;
+            var S41 = 6, S42 = 10, S43 = 15, S44 = 21;
+            string = uTF8Encode(string);
+            x = convertToWordArray(string);
+            a = 0x67452301; b = 0xEFCDAB89; c = 0x98BADCFE; d = 0x10325476;
+            for (k = 0; k < x.length; k += 16) {
+                AA = a; BB = b; CC = c; DD = d;
+                a = FF(a, b, c, d, x[k + 0], S11, 0xD76AA478);
+                d = FF(d, a, b, c, x[k + 1], S12, 0xE8C7B756);
+                c = FF(c, d, a, b, x[k + 2], S13, 0x242070DB);
+                b = FF(b, c, d, a, x[k + 3], S14, 0xC1BDCEEE);
+                a = FF(a, b, c, d, x[k + 4], S11, 0xF57C0FAF);
+                d = FF(d, a, b, c, x[k + 5], S12, 0x4787C62A);
+                c = FF(c, d, a, b, x[k + 6], S13, 0xA8304613);
+                b = FF(b, c, d, a, x[k + 7], S14, 0xFD469501);
+                a = FF(a, b, c, d, x[k + 8], S11, 0x698098D8);
+                d = FF(d, a, b, c, x[k + 9], S12, 0x8B44F7AF);
+                c = FF(c, d, a, b, x[k + 10], S13, 0xFFFF5BB1);
+                b = FF(b, c, d, a, x[k + 11], S14, 0x895CD7BE);
+                a = FF(a, b, c, d, x[k + 12], S11, 0x6B901122);
+                d = FF(d, a, b, c, x[k + 13], S12, 0xFD987193);
+                c = FF(c, d, a, b, x[k + 14], S13, 0xA679438E);
+                b = FF(b, c, d, a, x[k + 15], S14, 0x49B40821);
+                a = GG(a, b, c, d, x[k + 1], S21, 0xF61E2562);
+                d = GG(d, a, b, c, x[k + 6], S22, 0xC040B340);
+                c = GG(c, d, a, b, x[k + 11], S23, 0x265E5A51);
+                b = GG(b, c, d, a, x[k + 0], S24, 0xE9B6C7AA);
+                a = GG(a, b, c, d, x[k + 5], S21, 0xD62F105D);
+                d = GG(d, a, b, c, x[k + 10], S22, 0x2441453);
+                c = GG(c, d, a, b, x[k + 15], S23, 0xD8A1E681);
+                b = GG(b, c, d, a, x[k + 4], S24, 0xE7D3FBC8);
+                a = GG(a, b, c, d, x[k + 9], S21, 0x21E1CDE6);
+                d = GG(d, a, b, c, x[k + 14], S22, 0xC33707D6);
+                c = GG(c, d, a, b, x[k + 3], S23, 0xF4D50D87);
+                b = GG(b, c, d, a, x[k + 8], S24, 0x455A14ED);
+                a = GG(a, b, c, d, x[k + 13], S21, 0xA9E3E905);
+                d = GG(d, a, b, c, x[k + 2], S22, 0xFCEFA3F8);
+                c = GG(c, d, a, b, x[k + 7], S23, 0x676F02D9);
+                b = GG(b, c, d, a, x[k + 12], S24, 0x8D2A4C8A);
+                a = HH(a, b, c, d, x[k + 5], S31, 0xFFFA3942);
+                d = HH(d, a, b, c, x[k + 8], S32, 0x8771F681);
+                c = HH(c, d, a, b, x[k + 11], S33, 0x6D9D6122);
+                b = HH(b, c, d, a, x[k + 14], S34, 0xFDE5380C);
+                a = HH(a, b, c, d, x[k + 1], S31, 0xA4BEEA44);
+                d = HH(d, a, b, c, x[k + 4], S32, 0x4BDECFA9);
+                c = HH(c, d, a, b, x[k + 7], S33, 0xF6BB4B60);
+                b = HH(b, c, d, a, x[k + 10], S34, 0xBEBFBC70);
+                a = HH(a, b, c, d, x[k + 13], S31, 0x289B7EC6);
+                d = HH(d, a, b, c, x[k + 0], S32, 0xEAA127FA);
+                c = HH(c, d, a, b, x[k + 3], S33, 0xD4EF3085);
+                b = HH(b, c, d, a, x[k + 6], S34, 0x4881D05);
+                a = HH(a, b, c, d, x[k + 9], S31, 0xD9D4D039);
+                d = HH(d, a, b, c, x[k + 12], S32, 0xE6DB99E5);
+                c = HH(c, d, a, b, x[k + 15], S33, 0x1FA27CF8);
+                b = HH(b, c, d, a, x[k + 2], S34, 0xC4AC5665);
+                a = II(a, b, c, d, x[k + 0], S41, 0xF4292244);
+                d = II(d, a, b, c, x[k + 7], S42, 0x432AFF97);
+                c = II(c, d, a, b, x[k + 14], S43, 0xAB9423A7);
+                b = II(b, c, d, a, x[k + 5], S44, 0xFC93A039);
+                a = II(a, b, c, d, x[k + 12], S41, 0x655B59C3);
+                d = II(d, a, b, c, x[k + 3], S42, 0x8F0CCC92);
+                c = II(c, d, a, b, x[k + 10], S43, 0xFFEFF47D);
+                b = II(b, c, d, a, x[k + 1], S44, 0x85845DD1);
+                a = II(a, b, c, d, x[k + 8], S41, 0x6FA87E4F);
+                d = II(d, a, b, c, x[k + 15], S42, 0xFE2CE6E0);
+                c = II(c, d, a, b, x[k + 6], S43, 0xA3014314);
+                b = II(b, c, d, a, x[k + 13], S44, 0x4E0811A1);
+                a = II(a, b, c, d, x[k + 4], S41, 0xF7537E82);
+                d = II(d, a, b, c, x[k + 11], S42, 0xBD3AF235);
+                c = II(c, d, a, b, x[k + 2], S43, 0x2AD7D2BB);
+                b = II(b, c, d, a, x[k + 9], S44, 0xEB86D391);
+                a = addUnsigned(a, AA);
+                b = addUnsigned(b, BB);
+                c = addUnsigned(c, CC);
+                d = addUnsigned(d, DD);
+            }
+            var tempValue = wordToHex(a) + wordToHex(b) + wordToHex(c) + wordToHex(d);
+            return tempValue.toLowerCase();
+        },
+        random_string: function (len) {
+            len = len || 32;
+            var $chars = 'ABCDEFGHJKMNPQRSTWXYZabcdefhijkmnprstwxyz2345678'; /* 默认去掉了容易混淆的字符oOLl,9gq,Vv,Uu,I1 */
+            var maxPos = $chars.length;
+            var pwd = '';
+            for (i = 0; i < len; i++) {
+                pwd += $chars.charAt(Math.floor(Math.random() * maxPos));
+            }
+            return pwd;
+        }
+    });
+
+    /*
+    * ajaxxy 代码开始 ----------------------------------------------
+    * */
+
     $(document).ready(function(){
         $("form").find("button[type='submit']").bind("click",function(){
             auto_submit(this);
         });
     });
-    ajaxxy = function (form_ele){
-        form_ele = $(form_ele).get(0);
-        if(form_ele){
-            return getPrimaryFn(form_ele);
-        }else{
-            return getPrimaryFn(ajaxxy);
+    /*定义的初始变量*/
+    var form_ele;
+    ajaxxy = function (f){
+        f = $(f).get(0);
+        if(f){
+            form_ele = f;
+            return getPrimaryFn(f);
         }
     }
+    getPrimaryFn(ajaxxy);
     function getPrimaryFn(e){/*给初始属性*/
-        if(e && e._ajaxxy == true){
+        if( e && e._ajaxxy){
             return e;
         }
-        if(e){
-            e._ajaxxy = true;
+        if( e ){
+            e._ajaxxy = $.md5($.random_string(32));
             e.submit = auto_submit;
             e.t = Translate;
             e.set = set;
             e.get = get;
-            e.info = PrivateCreateInfo;
+            e.info = Info;
+            e.error = Info;
+            e.remove = function (name){
+                switch (name){
+                    case 'error':
+                        removeError(e);
+                        break;
+                }
+            }
             return e;
         }
         return getPrimaryFn(ajaxxy);
@@ -70,10 +279,12 @@
             }
         }
     }
-    function _debug(a){/*一个被调用的符加函数*/
+    function _debug(){/*一个被调用的符加函数*/
+        var arg = Array.prototype.slice.call(arguments);
+        if(!arg)return _debug._this_debug;/*便于了解debug是否被设置为true*/
         if(_debug._this_debug === true){
-            var arg = Array.prototype.slice.call(arguments);
-            arg.splice(0,1);
+            //console.log(arg);
+            //arg.splice(0,1);
             var t = "";
             for(var i =0;i<arg.length;i++){
                 if(typeof arg[i] == "string"){
@@ -108,7 +319,7 @@
 
     function createInterior(e){
         var help=false,ele=ajaxxy;
-        if(typeof e == "boolean")
+        if( typeof e == "boolean" )
             help = e;
         else
         if(e)ele = e;
@@ -128,7 +339,11 @@
             },
             "unique":{
                 "value":[],
-                "comment":"必须校验的input,即input不能为空值"
+                "comment":"必须校验的表单(id或name),即input不能为空值"
+            },
+            "skip":{
+                "value":[],
+                "comment":"需要跳过的表单(id或name),优先级不如 unique"
             },
             "abandon":{
                 "value":false,
@@ -227,6 +442,8 @@
         }
         var source_form_ele = $(f).get(0);
         var interior= source_form_ele.primaryInterior ? source_form_ele.primaryInterior : createInterior(f);
+        _debug('----------======interior======---------',interior);
+        auto_submit['interior'] = interior;
         if( !j ){
             j={};
         }
@@ -269,7 +486,11 @@
             _debug('-------------打印From表单------------',form_up);
         }
         $(names_).each(function(a,b){/*翻转为了正向提示*/
-            if(interior.abandon !== true || InArr(interior.unique,$(b).attr('name')) ){
+            var is_skip = !InArr(interior.skip,$(b).attr('name')) && !InArr(interior.skip,$(b).attr('id')),/*跳过*/
+                is_unique = InArr(interior.unique,$(b).attr('name')),/*强制检查*/
+                is_abandon = interior.abandon !== true,/*跳过所有*/
+                is_checked = is_unique || (is_abandon && is_skip);/*跳过此项*/
+            if( is_checked ){
                 if($(b).attr('type') == 'password'){
                     if(pwd== '' ){
                         pwd = $(b).val();
@@ -283,7 +504,6 @@
                         $(b).focus();
                         lastEle = b;
                         submit_ = false;
-                        /*console.log(b)*/
                     }
                 }
             }
@@ -360,11 +580,11 @@
             var name_ = $(lastEle).attr('name'),alert_;
             try{
                 alert_ = $('[for='+name_+']').html( );
-            }catch(e){
-                console.log(e);.
-                alert_ = name_;
+                PrivateONECreateInfo('请先填写 : '+alert_);
+            }catch(_e){
+                PrivateONECreateInfo('有表单值为空， 请先填写');
+                console.log(_e);
             }
-            PrivateONECreateInfo('请先填写 : '+alert_);
             return false;
         }
         if( repwd != '' && pwd != repwd ){
@@ -392,7 +612,7 @@
                 },
                 error:function(err){//报错后自动处理
                     interior["ajaxErrorCallback"] ? interior["ajaxErrorCallback"](err) : (function(){
-                        PrivateCreateInfo(err,'danger');
+                        Info(err,'danger');
                         console.log(err);
                     })();
                 }
@@ -499,7 +719,7 @@
                     }
                 }
                 _debug('----------执行私有CreateInfo信息-----------',infotype);
-                PrivateCreateInfo(alertHTML,infotype,interior);
+                Info(alertHTML,infotype,interior);
                 _debug('----------开始GETJavaScriptCode-----------',infotype);
                 GetJavaScriptCode(j,data,interior['debug']);/*自动请求JAVASCRIPTCODE后台事件驱动*/
                 _debug('-------------try完毕-------------');
@@ -512,7 +732,7 @@
                     console.log(er);
                 }
                 var html_ = '<i class="ace-icon fa fa-exclamation-triangle bigger-120"></i>'+data;
-                PrivateCreateInfo(html_,'warning',interior);
+                Info(html_,'warning',interior);
                 _debug('-------------catch完毕-------------');
             }
 
@@ -533,12 +753,41 @@
                 infotype = 'danger';
             }
             var text_ = '<i class="ace-icon fa '+infotype+' bigger-120"></i>'+text;
-            PrivateCreateInfo(text_,infotype);
+            Info(text_,infotype);
         }
         /*-------------------------------------------------*/
     }
-    function PrivateCreateInfo(info_text,info_type,interior,from_element,debug){
-        if(debug){
+    function Info(info_text,info_type,interior,from_element,debug){
+        if(!interior){
+            interior = $(from_element).get(0) ? $(from_element).get(0).primaryInterior : auto_submit.interior;
+            if(!interior) interior = createInterior(ajaxxy);
+        }
+        /*得到显示的元素*/
+        if(!from_element){
+            from_element = interior['form'] ? interior['form'] : (  ('interior' in auto_submit) ? auto_submit.interior['form'] : null  );
+        }
+        /*提示类型*/
+        if(!info_type){
+            info_type = 'warning';/*显示类型*/
+        }
+        if(!from_element){
+            if(form_ele){
+                removeError(form_ele);
+                $(form_ele).before('<div data-infoToken="'+Getajaxxy(form_ele)+'" class="alert alert-'+info_type+'">\n' +
+                    '\t<a href="#" class="close" data-dismiss="alert">\n' +
+                    '\t\t&times;\n' +
+                    '\t</a>\n' +
+                    '\t<strong>'+info_text+'</strong>\n' +
+                    '</div>');
+            }else{
+                alert(info_text);
+            }
+            return;
+        }
+        if(typeof info_type  === 'boolean'){
+            debug = info_type;
+        }
+        if(debug || _debug._this_debug ){
             console.log("----------======Info DeBug======---------");
             console.log(info_text);
             console.log(info_type);
@@ -553,15 +802,9 @@
                 }
             }
         */
-        if(!interior){
-            interior = $(from_element).get(0) ? $(from_element).get(0).primaryInterior : createInterior(ajaxxy);
-        }
         interior.alertLocation = interior.alertLocation.replace(/\s/g,'').toLowerCase();
         /*info => fa-comment  | warning => fa-exclamation-triangle | success =>fa-check | dismissable(不理会) +> fa-info-circle | danger(危险) fa-times*/
         var icon = 'fa-times';
-        if(!info_type){
-            info_type = 'danger';/*显示类型*/
-        }
         var infoTitle = '错误 : ';
         switch(info_type){
             case 'info':
@@ -605,7 +848,7 @@
         }
         _debug(info_type);
         var after_html = '';
-        after_html += '<div class="clearfix" data-alertinfo="true" >';
+        after_html += '<div data-infoToken="'+Getajaxxy(from_element)+'" class="clearfix" data-alertinfo="true" >';
         after_html += '<div class="pull alert alert-'+info_type+'" '+( (interior.alertLocation != 'before') ? 'style="margin-top: 10px;margin-bottom: 0px;"' : '' )+'>';
         after_html += '<button type="button" class="close" data-dismiss="alert">';
         after_html += '<i class="ace-icon fa fa-times"></i>';
@@ -614,10 +857,6 @@
         after_html += '</div>';
         after_html += '</div>';
         _debug(after_html);
-        /*得到显示的元素*/
-        if(!from_element){
-            from_element = interior['form'];
-        }
         /*得到显示的元素*/
         var alertTo = $(from_element);
         _debug(alertTo);
@@ -828,5 +1067,23 @@
                 }
             }
         }
+    }
+
+    /*移除一个报错信息*/
+    function removeError(e){
+        var id = Getajaxxy(e);
+        if(id){
+            $('[data-infoToken="'+id+'"]').remove();
+        }
+    }
+    function Getajaxxy(e){
+        try{
+            return e._ajaxxy;
+        }catch(_e){
+            console.log(_e);
+            console.log(e);
+            return '';
+        }
+        return '';
     }
 })(jQuery);
