@@ -300,7 +300,6 @@
                         t="";
                     }
                     console.log(arg[i]);
-
                 }
             }
         }
@@ -466,27 +465,17 @@
         _debug('-------from start--------');
 
         var form_ = $(f).get(0);
-        interior['form'] = form_;/*报错时需要用到,默认在表单上面报错.*/
-        var submit_ = true;
-        var sendtype = $(form_).attr('method');
-        if(!sendtype){
-            sendtype ="post";
-        }
-        sendtype = sendtype.toLowerCase()
-        var pwd='';
-        var repwd='';
-        var repwdObj = null;
-        var names_ = $(f).find('[name]').toArray().reverse();
-        var form_data;
-        var lastEle = null;
-        var editClass = is_edit('editClass');//带有class值的 div为编辑器.
+        var submit_ = true,
+            sendtype = ( $(form_).attr('method') ? $(form_).attr('method') : "post" ).toLowerCase();
+        var pwd='',
+            repwd='',
+            repwdObj = null,
+            names_ = $(f).find('[name]').toArray().reverse(),
+            form_data = ( sendtype == 'post' ) ? new FormData() : {},
+            lastEle = null,
+            editClass = is_edit('editClass');//带有class值的 div为编辑器.
         _debug(form_);
-        if(sendtype == 'post'){
-            form_data = new FormData(form_);/*新建一个Form用于提交*/
-        }
-        if(sendtype == 'get'){
-            form_data = $(form_).serialize();/*新建一个Form用于提交*/
-        }
+        interior['form'] = form_;/*报错时需要用到,默认在表单上面报错.*/
         $(names_).each(function(a,b){
             /*判断未填写*/
             var is_skip = !InArr(interior.skip,$(b).attr('name')) && !InArr(interior.skip,$(b).attr('id')),/*跳过*/
@@ -510,14 +499,73 @@
                     }
                 }
             }
-            if(InArr(editClass,$(b).attr('class'))){
+
+            /*post 和 get的取值方式,
+            1.如果是从带有编辑器的元素中取值, 则检测该元素的编辑class标签,该标签会把普通元素变成editor
+            2.如果不是编辑器,则分别取值,POST的值添加到new FormData()中.主要是为了提交给POST时不失去一些元素,比如文件.
+            3.get提交则直接取各元素的value则可.
+            */
+            var name_tmp = $(b).attr('name');
+            if(InArr(editClass,$(b).attr('class'))){//编辑器取值
                 _debug('有个性编辑器...',$(b).attr('name'));
-                /*自带的编辑器,不是读取val而是html()*/
                 if(sendtype == 'post'){
-                    form_up.append($(b).attr('name'), $(b).html());
+                    form_data.append($(b).attr('name'), $(b).html());
                 }
                 if(sendtype == 'get'){
-                    getData[$(b).attr('name')] = $(b).html();
+                    form_data[$(b).attr('name')] = $(b).html();
+                }
+            }else{//非编辑器
+                var tmptype_input = $(b).attr('type');
+                if(sendtype == 'post'){
+                    _debug('---------post开始获取数据----------');
+                    if( tmptype_input == 'file' ){
+                        _debug(name_tmp);
+                        if($(b)[0].files[0]){
+                            form_data.append(name_tmp, $(b)[0].files[0]);
+                        }
+                    }else{
+                        /*------------加入对hceckbox的判断------------*/
+                        switch(tmptype_input){
+                            case 'checkbox':/*复选框取值方式不同*/
+                                if ($(b).get(0).checked) {
+                                    var v_tmp = $(b).val();
+                                }else{
+                                    var v_tmp = '';
+                                }
+                                _debug('---------提取checkbox值'+name_tmp+'--'+v_tmp+'--');
+                                form_data.append(name_tmp, v_tmp);
+                                break;
+                            case 'radio':/*复选框取值方式不同*/
+                                var v_tmp = $("input:radio[name='"+name_tmp+"']:checked").val();
+                                _debug('---------提取radio值'+name_tmp+'--'+v_tmp+'--');
+                                form_data.append(name_tmp, v_tmp);
+                                break;
+                            default:
+                                var v_tmp = $(b).val();
+                                _debug('---------提取input值'+name_tmp+'--'+v_tmp+'--');
+                                form_data.append(name_tmp, v_tmp);
+                                break;
+                        }
+                        /*------------加入对hceckbox的判断------------*/
+                    }
+                }
+                if(sendtype == 'get'){
+                        /*------------加入对hceckbox的判断------------*/
+                            _debug('---------get开始获取数据----------');
+                switch(tmptype_input){
+                    case 'checkbox':/*复选框取值方式不同*/
+                        if ($(b).get(0).checked) {
+                                form_data[name_tmp] = $(b).val();
+                            }else{
+                                form_data[name_tmp] = '';
+                            }
+                        break;
+                    case 'radio':/*复选框取值方式不同*/
+                        form_data[name_tmp] = $("input:radio[name='"+name_tmp+"']:checked").val();
+                        break;
+                    default:
+                        form_data[name_tmp] = $(b).val();
+                        break;
                 }
             }
         });
@@ -526,12 +574,21 @@
             _debug('---------表单值需要验证,为空无法提交----------',lastEle);
             var name_ = $(lastEle).attr('name'),alert_;
             try{
-                alert_ = $('[for='+name_+']').html( );
-                PrivateONECreateInfo('请先填写 : '+alert_);
+                alert_ = $('[for="'+name_+'"]').html();
             }catch(_e){
-                PrivateONECreateInfo('有表单值为空， 请先填写');
                 console.log(_e);
+                alert_ = '';
             }
+            if(!alert_){
+              alert_ = $(lastEle).attr('placeholder');
+              if(!alert_){
+                alert_= name_;
+              }
+              if(!alert_){
+                alert_="该表单不允许为空.";
+              }
+            }
+            PrivateONECreateInfo('请先填写 : '+alert_);
             return false;
         }
 
@@ -560,9 +617,9 @@
                     CallBackFn(interior,data);
                 },
                 error:function(err){//报错后自动处理
+                    console.log(err);
                     interior["ajaxErrorCallback"] ? interior["ajaxErrorCallback"](err) : (function(){
                         Info(err,'danger');
-                        console.log(err);
                     })();
                 }
             };
@@ -584,6 +641,7 @@
             _debug('------------'+sendtype+'提交 ['+submit_qeust["text"]+'][提交数据:'+submit_qeust["up_data_name"]+']-------------',submit_qeust["data"]);
             console.log("-------------test--------------------");
             console.log(ajaxOption);
+            $('[data-alertinfo="true"]').remove();
             $.ajax(ajaxOption);
             return false;
         }
